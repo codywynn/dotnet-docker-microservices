@@ -2,6 +2,21 @@ version: '3'
 
 services:
 
+  webmvc:
+      image: web 
+      build:
+        context: ./web
+        dockerfile: Dockerfile.debug
+      ports: 
+      - "8080:80"
+      volumes: 
+        - ./web/bin/pub/:/app
+      container_name: web
+      depends_on:
+        - applicants.api
+        - identity.api
+        - jobs.api
+
   # Container
   applicants.api:
     # Image name to start the container from
@@ -16,15 +31,21 @@ services:
     ports: 
     - "8081:80"
 
-    # Allows mount pahts on host inside the container. Useful to debuggigng
+    # Allows mount paths on host inside the container. Useful to debuggigng
     volumes: 
       - ./services/applicants.api/bin/pub/:/app
 
     # Custom name for container
     container_name: applicants.api
 
+    depends_on:
+      - sql.data
+      - rabbitmq
+
   identity.api:
     image: identity.api
+    environment:
+      - RedisHost=user.data:6379
     build:
       context: ./services/identity.api
       dockerfile: Dockerfile.debug
@@ -32,7 +53,10 @@ services:
     - "8084:80"
     volumes: 
       - ./services/identity.api/bin/pub/:/app
-    container_name: identity.api     
+    container_name: identity.api
+    depends_on:
+      - sql.data
+      - rabbitmq
 
   jobs.api:
     image: jobs.api
@@ -45,6 +69,10 @@ services:
       - ./services/jobs.api/bin/pub/:/app
     container_name: jobs.api
 
+    # Add dependency for sql.data
+    depends_on:
+      - sql.data
+
   # Don't containerize database in production
   sql.data:
     image: mssql-linux
@@ -54,3 +82,14 @@ services:
     ports:
       - "5433:1433"
     container_name: mssql-linux
+
+  # Add redis instance
+  user.data:
+    image: redis  
+
+  # Rabbit MQ instance
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "15672:15672"
+    container_name: rabbitmq
